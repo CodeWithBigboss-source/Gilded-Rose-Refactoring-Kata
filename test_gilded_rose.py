@@ -53,6 +53,77 @@ class TestNormalItem:
         gilded_rose.update_quality()
         assert items[0].name == "+5 Dexterity Vest"
 
+class TestAgedBrie:
+    """
+    Aged Brie increases in quality as it ages — the opposite of
+    normal items. It still caps at 50, and still 'degrades' (here,
+    increases) twice as fast once expired.
+    """
+
+    @pytest.mark.parametrize("sell_in, quality, expected_sell_in, expected_quality", [
+        (10, 20, 9, 21),    # ordinary in-date day: +1 quality
+        (2, 0, 1, 1),       # starting from zero
+        (0, 2, -1, 4),      # crosses sell-by THIS call -> +2, not +1
+        (-3, 8, -4, 10),    # already expired -> still +2/day
+        (5, 49, 4, 50),     # cap: 49 -> 50, stops there
+        (0, 49, -1, 50),    # cap holds even during the double-jump
+        (5, 50, 4, 50),     # already at cap -> stays at cap
+    ])
+    def test_increases_correctly(self, sell_in, quality, expected_sell_in, expected_quality):
+        actual_sell_in, actual_quality = update_quality_once("Aged Brie", sell_in, quality)
+        assert actual_sell_in == expected_sell_in
+        assert actual_quality == expected_quality
+
+
+class TestSulfuras:
+    """
+    Sulfuras is a legendary item: it is never sold and never decreases
+    in quality. sell_in and quality both stay completely frozen,
+    whether in date or expired. Its quality of 80 is the one
+    legal exception to the normal 0-50 range.
+    """
+
+    @pytest.mark.parametrize("sell_in, quality", [
+        (5, 80),    # in date
+        (0, 80),    # exactly at sell-by
+        (-5, 80),   # expired
+    ])
+    def test_never_changes(self, sell_in, quality):
+        actual_sell_in, actual_quality = update_quality_once(
+            "Sulfuras, Hand of Ragnaros", sell_in, quality
+        )
+        assert actual_sell_in == sell_in       # unchanged
+        assert actual_quality == quality       # unchanged
+
+
+class TestBackstagePasses:
+    """
+    Backstage passes increase in quality as the concert approaches:
+      +1 when there are more than 10 days left
+      +2 when there are 10 days or less
+      +3 when there are 5 days or less
+      drop to 0 the moment the concert has happened (sell_in < 0)
+    Quality still caps at 50 on the way up.
+    """
+
+    NAME = "Backstage passes to a TAFKAL80ETC concert"
+
+    @pytest.mark.parametrize("sell_in, quality, expected_sell_in, expected_quality", [
+        (15, 20, 14, 21),   # >10 days left -> +1
+        (11, 20, 10, 21),   # boundary: 11 days left is still the +1 tier
+        (10, 20, 9, 22),    # boundary: 10 days left -> +2 tier starts
+        (6, 20, 5, 22),     # still +2 tier
+        (5, 20, 4, 23),     # boundary: 5 days left -> +3 tier starts
+        (1, 20, 0, 23),     # still +3 tier
+        (0, 20, -1, 0),     # concert just happened -> drops to 0
+        (-1, 0, -2, 0),     # already past concert -> stays 0
+        (10, 49, 9, 50),    # cap: 49 -> 50, stops (would've been 51)
+        (5, 48, 4, 50),     # cap during the +3 tier
+    ])
+    def test_rises_then_drops_correctly(self, sell_in, quality, expected_sell_in, expected_quality):
+        actual_sell_in, actual_quality = update_quality_once(self.NAME, sell_in, quality)
+        assert actual_sell_in == expected_sell_in
+        assert actual_quality == expected_quality
 
 if __name__ == '__main__':
     pytest.main()
