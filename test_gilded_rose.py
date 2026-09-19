@@ -170,5 +170,29 @@ class TestGoldenMaster:
 
         assert actual_output == expected_output
 
+class TestConjuredItems:
+    """
+    Conjured items degrade in quality twice as fast as normal items:
+      -2/day while in date
+      -4/day once expired
+    Quality still never drops below 0. We match a "Conjured" item
+    by exact name to keep the rule explicit and unambiguous.
+    """
+
+    NAME = "Conjured Mana Cake"
+
+    @pytest.mark.parametrize("sell_in, quality, expected_sell_in, expected_quality", [
+        (10, 20, 9, 18),   # ordinary in-date day: -2 quality
+        (5, 7, 4, 5),       # another ordinary day
+        (0, 6, -1, 2),      # crosses sell-by THIS call -> degrades by 4
+        (-5, 10, -6, 6),    # already expired -> still -4/day
+        (5, 1, 4, 0),       # floor: never goes negative
+        (0, 3, -1, 0),      # floor still holds during the double-drop
+    ])
+    def test_degrades_twice_as_fast(self, sell_in, quality, expected_sell_in, expected_quality):
+        actual_sell_in, actual_quality = update_quality_once(self.NAME, sell_in, quality)
+        assert actual_sell_in == expected_sell_in
+        assert actual_quality == expected_quality
+
 if __name__ == '__main__':
     pytest.main()
