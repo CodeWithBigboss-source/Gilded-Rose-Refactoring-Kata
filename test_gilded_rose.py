@@ -7,6 +7,7 @@ before any refactoring. They exist as a safety net: if a refactor changes
 any of these results, a test will fail immediately.
 """
 import pytest
+import os
 
 from gilded_rose import Item, GildedRose
 
@@ -124,6 +125,50 @@ class TestBackstagePasses:
         actual_sell_in, actual_quality = update_quality_once(self.NAME, sell_in, quality)
         assert actual_sell_in == expected_sell_in
         assert actual_quality == expected_quality
+
+class TestGoldenMaster:
+    """
+    Regression safety net for the refactor. golden_master.txt was
+    captured by running generate_golden_master.py against the
+    ORIGINAL, unrefactored GildedRose implementation. This test
+    reruns the exact same simulation against whatever code is
+    currently in gilded_rose.py and asserts the output is byte-for-
+    byte identical -- proving the refactor changed no behavior.
+    """
+
+    DAYS = 30
+
+    def _build_items(self):
+        return [
+            Item("+5 Dexterity Vest", 10, 20),
+            Item("Aged Brie", 2, 0),
+            Item("Elixir of the Mongoose", 5, 7),
+            Item("Sulfuras, Hand of Ragnaros", 0, 80),
+            Item("Sulfuras, Hand of Ragnaros", -1, 80),
+            Item("Backstage passes to a TAFKAL80ETC concert", 15, 20),
+            Item("Backstage passes to a TAFKAL80ETC concert", 10, 49),
+            Item("Backstage passes to a TAFKAL80ETC concert", 5, 49),
+            Item("Conjured Mana Cake", 3, 6),
+        ]
+
+    def test_output_matches_golden_master(self):
+        items = self._build_items()
+        gilded_rose = GildedRose(items)
+        lines = []
+        for day in range(self.DAYS):
+            lines.append(f"-------- day {day} --------")
+            for item in items:
+                lines.append(repr(item))
+            gilded_rose.update_quality()
+        actual_output = "\n".join(lines)
+
+        golden_master_path = os.path.join(
+            os.path.dirname(__file__), "golden_master.txt"
+        )
+        with open(golden_master_path) as f:
+            expected_output = f.read()
+
+        assert actual_output == expected_output
 
 if __name__ == '__main__':
     pytest.main()
