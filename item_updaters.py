@@ -85,15 +85,33 @@ class BackstagePassUpdater:
     def _improve(self, item, amount):
         item.quality = min(MAX_QUALITY, item.quality + amount)
 
+class ConjuredUpdater:
+    """
+    Conjured items degrade in quality twice as fast as normal items:
+      -2/day while in date
+      -4/day once expired
+    Quality never drops below 0.
+    """
+
+    def update(self, item):
+        item.sell_in -= 1
+        self._degrade(item, amount=2)
+        if item.sell_in < 0:
+            self._degrade(item, amount=2)
+
+    def _degrade(self, item, amount):
+        item.quality = max(MIN_QUALITY, item.quality - amount)
 
 AGED_BRIE = "Aged Brie"
 SULFURAS = "Sulfuras, Hand of Ragnaros"
 BACKSTAGE_PASSES = "Backstage passes to a TAFKAL80ETC concert"
+CONJURED_PREFIX = "Conjured"
 
 _normal_updater = NormalItemUpdater()
 _aged_brie_updater = AgedBrieUpdater()
 _sulfuras_updater = SulfurasUpdater()
 _backstage_updater = BackstagePassUpdater()
+_conjured_updater = ConjuredUpdater()
 
 
 def get_updater_for(item):
@@ -109,6 +127,8 @@ def get_updater_for(item):
         return _sulfuras_updater
     if item.name == BACKSTAGE_PASSES:
         return _backstage_updater
+    if item.name.startswith(CONJURED_PREFIX):
+        return _conjured_updater
     return _normal_updater
 
 
